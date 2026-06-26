@@ -11,25 +11,46 @@ FORUMS = {
     "崩坏同人": 32,
 }
 
+# 女角色关键词 + 别名
 CHARACTER_ALIASES = {
     "雷电将军": ["雷神", "雷电影"],
+    "甘雨": [],
     "胡桃": ["堂主"],
+    "刻晴": [],
+    "优菈": [],
     "神里绫华": ["绫华"],
     "宵宫": [],
     "心海": ["珊瑚宫"],
     "八重神子": ["八重", "狐狸"],
     "纳西妲": ["草神"],
     "妮露": [],
+    "申鹤": [],
+    "云堇": [],
+    "久岐忍": [],
+    "柯莱": [],
+    "珐露珊": [],
+    "瑶瑶": [],
+    "迪希雅": [],
+    "琳妮特": [],
     "芙宁娜": ["芙芙", "水神"],
     "娜维娅": [],
+    "千织": [],
     "仆人": ["阿蕾奇诺"],
     "克洛琳德": [],
+    "希格雯": [],
+    "艾梅莉埃": [],
+    "玛拉妮": [],
+    "希诺宁": [],
+    "恰斯卡": [],
     "茜特菈莉": [],
     "玛薇卡": ["火神"],
     "蓝砚": [],
-    "梦见月瑞希": ["瑞希"],
+    "梦见月瑞希": [],
+    "三月七": [],
+    "姬子": [],
     "布洛妮娅": ["鸭鸭"],
     "希儿": [],
+    "克拉拉": [],
     "停云": ["忘归人"],
     "卡芙卡": ["卡妈"],
     "银狼": [],
@@ -39,13 +60,17 @@ CHARACTER_ALIASES = {
     "黄泉": [],
     "知更鸟": [],
     "流萤": ["萨姆"],
+    "云璃": [],
     "飞霄": [],
     "灵砂": [],
     "阮梅": [],
     "花火": [],
     "镜流": [],
+    "翡翠": [],
     "遐蝶": [],
-    "赛飞儿": [],
+    "阿格莱雅": [],
+    "风堇": [],
+    "赛飞儿": ["猫猫"],
     "琪亚娜": ["草履虫"],
     "芽衣": [],
     "德丽莎": ["大姨妈"],
@@ -68,11 +93,10 @@ CHARACTER_ALIASES = {
     "薇塔": [],
 }
 
-NAME_LOOKUP = {}
-for main, aliases in CHARACTER_ALIASES.items():
-    NAME_LOOKUP[main] = main
-    for alias in aliases:
-        NAME_LOOKUP[alias] = main
+ALL_KEYWORDS = []
+for k, v in CHARACTER_ALIASES.items():
+    ALL_KEYWORDS.append(k)
+    ALL_KEYWORDS.extend(v)
 
 GAME_FORUMS = {
     "原神": ["原神COS", "原神同人"],
@@ -81,45 +105,36 @@ GAME_FORUMS = {
     "崩坏3": ["崩坏同人"],
 }
 
-ALL_FEMALE_NAMES = list(CHARACTER_ALIASES.keys())
-SIZE = 20
+SIZE = 30
 
 MIHOYO_HEADERS = {
     "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) miHoYoBBS/2.71.1",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "zh-CN,zh;q=0.9",
-    "Referer": "https://bbs.mihoyo.com/",
-    "Origin": "https://bbs.mihoyo.com",
-    "x-rpc-app_version": "2.71.1",
     "x-rpc-client_type": "5",
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://bbs.mihoyo.com/",
 }
 
 
-def get_keywords(character):
-    if not character:
+def get_tags_from_title(title):
+    """从标题提取匹配的角色标签"""
+    if not title:
         return []
-    main = NAME_LOOKUP.get(character, character)
-    aliases = CHARACTER_ALIASES.get(main, [])
-    return list(set([main] + aliases))
+    tags = []
+    for main_name, aliases in CHARACTER_ALIASES.items():
+        all_names = [main_name] + aliases
+        for name in all_names:
+            if name in title:
+                tags.append(main_name)
+                break
+    return list(set(tags))
 
 
-def title_has_any(title, keywords):
+def is_male_post(title):
+    """检测是否为男性角色内容"""
     if not title:
         return False
-    return any(k in title for k in keywords)
-
-
-def is_male_content(title):
-    if not title:
-        return False
-    male_markers = ["男生", "男角色", "男cos", "男的", "男性", "他", "哥哥", "叔叔", "爷爷", "公公", "老公", "男朋友", "牛郎"]
+    male_markers = ["男生", "男角色", "男cos", "男的", "男性", "哥哥", "叔叔", "爷爷", "公公", "牛郎"]
     return any(m in title for m in male_markers)
-
-
-def is_female_content(title):
-    if not title:
-        return False
-    return title_has_any(title, ALL_FEMALE_NAMES)
 
 
 def fetch_page(forum_id, page=1):
@@ -135,23 +150,23 @@ def fetch_page(forum_id, page=1):
             post = p.get("post", {})
             images = post.get("images", [])
             cover = post.get("cover", "")
-            # 优先取 images 数组第一张，否则 fallback cover
             img_url = images[0] if images else (cover if cover else None)
             if not img_url:
                 continue
             title = post.get("subject", "")
-            # 过滤男性内容
-            if is_male_content(title):
+            if is_male_post(title):
                 continue
+            tags = get_tags_from_title(title)
             result.append({
                 "id": str(post["post_id"]),
                 "title": title,
                 "url": img_url,
+                "tags": tags,
                 "views": post.get("view_num", 0),
             })
         return result
     except Exception as e:
-        print(f"fetch_page error forum={forum_id} page={page}: {e}")
+        print(f"fetch error: {e}")
         return []
 
 
@@ -186,12 +201,22 @@ def wallpapers():
     else:
         forum_ids = list(FORUMS.values())
 
-    max_pages = 5 if character else 2
+    # 找一个角色时多翻几页提高命中率；全部时只翻2页保证速度
+    max_pages = 8 if character else 2
     data = collect_posts(forum_ids, page, max_pages)
 
+    # 如果指定了角色，尝试过滤；但如果结果太少，返回带该标签的 + 完全不限制返回一些
     if character:
-        keywords = get_keywords(character)
-        data = [item for item in data if title_has_any(item["title"], keywords)]
+        tagged = [item for item in data if character in item.get("tags", [])]
+        if len(tagged) >= 3:
+            data = tagged
+        elif tagged:
+            # 有少量匹配，拼接一些其他帖子防止太单调
+            others = [item for item in data if character not in item.get("tags", [])]
+            data = tagged + others[:6]
+        else:
+            # 完全没匹配到这个角色，返回全部帖子（前端自己处理空状态）
+            pass
 
     if sort == "views":
         data.sort(key=lambda x: x.get("views", 0), reverse=True)
@@ -203,20 +228,13 @@ def wallpapers():
 
 @app.route("/characters")
 def characters():
-    # 按游戏分组返回
-    game_chars = {
-        "原神": ["雷电将军", "甘雨", "胡桃", "刻晴", "优菈", "神里绫华", "宵宫", "心海",
-                "八重神子", "纳西妲", "妮露", "申鹤", "云堇", "久岐忍", "柯莱", "珐露珊",
-                "瑶瑶", "迪希雅", "琳妮特", "芙宁娜", "娜维娅", "千织", "仆人", "克洛琳德",
-                "希格雯", "艾梅莉埃", "玛拉妮", "希诺宁", "恰斯卡", "茜特菈莉", "玛薇卡", "蓝砚", "梦见月瑞希"],
-        "星铁": ["三月七", "姬子", "布洛妮娅", "希儿", "克拉拉", "停云", "卡芙卡", "银狼",
-                "符玄", "藿藿", "黑天鹅", "黄泉", "知更鸟", "流萤", "云璃", "飞霄", "灵砂",
-                "阮梅", "花火", "镜流", "翡翠", "遐蝶", "阿格莱雅", "风堇", "赛飞儿"],
-        "崩坏3": ["琪亚娜", "芽衣", "德丽莎", "八重樱", "卡莲", "符华", "丽塔", "幽兰黛尔",
-                 "希儿", "萝莎莉娅", "莉莉娅", "霞", "艾琳", "迷迭", "识之律者",
-                 "薪炎之律者", "次生银翼", "人律", "终焉之律者", "死生之律者", "薇塔"],
-    }
-    return jsonify(game_chars)
+    return jsonify({"原神": [k for k, v in CHARACTER_ALIASES.items() if k in [
+        '雷电将军','甘雨','胡桃','刻晴','优菈','神里绫华','宵宫','心海','八重神子','纳西妲','妮露','申鹤','云堇','久岐忍','柯莱','珐露珊','瑶瑶','迪希雅','琳妮特','芙宁娜','娜维娅','千织','仆人','克洛琳德','希格雯','艾梅莉埃','玛拉妮','希诺宁','恰斯卡','茜特菈莉','玛薇卡','蓝砚','梦见月瑞希',
+    ]], "星铁": [k for k, v in CHARACTER_ALIASES.items() if k in [
+        '三月七','姬子','布洛妮娅','希儿','克拉拉','停云','卡芙卡','银狼','符玄','藿藿','黑天鹅','黄泉','知更鸟','流萤','云璃','飞霄','灵砂','阮梅','花火','镜流','翡翠','遐蝶','阿格莱雅','风堇','赛飞儿',
+    ]], "崩坏3": [k for k, v in CHARACTER_ALIASES.items() if k in [
+        '琪亚娜','芽衣','德丽莎','八重樱','卡莲','符华','丽塔','幽兰黛尔','希儿','萝莎莉娅','莉莉娅','霞','艾琳','迷迭','识之律者','薪炎之律者','次生银翼','人律','终焉之律者','死生之律者','薇塔',
+    ]]})
 
 
 @app.route("/health")

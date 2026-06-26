@@ -134,27 +134,20 @@ export default function HomeScreen({ navigation }) {
       const json = await res.json();
       const data = Array.isArray(json) ? json : [];
       
-      let filtered = data;
-      if (selectedCharacter !== '全部') {
-        const keywords = getSearchKeywords(selectedCharacter, selectedGame);
-        filtered = data.filter(item => {
-          if (!item.title) return false;
-          return keywords.some(k => item.title.includes(k));
-        });
-      }
+      let result = data;
       
       // 按浏览量降序
-      filtered.sort((a, b) => (b.views || 0) - (a.views || 0));
+      result.sort((a, b) => (b.views || 0) - (a.views || 0));
 
       if (append) {
         setWallpapers(prev => {
-          const combined = [...prev, ...filtered];
+          const combined = [...prev, ...result];
           return [...new Map(combined.map(item => [item.id, item])).values()];
         });
       } else {
-        setWallpapers(filtered);
+        setWallpapers(result);
       }
-      setHasMore(filtered.length > 0);
+      setHasMore(result.length > 0);
     } catch (e) {
       console.error('获取壁纸失败:', e);
     }
