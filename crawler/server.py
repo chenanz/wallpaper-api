@@ -140,9 +140,6 @@ def fetch_page(forum_id, page=1):
             if not img_url:
                 continue
             title = post.get("subject", "")
-            # 只保留有女性角色名的帖子
-            if not is_female_content(title):
-                continue
             # 过滤男性内容
             if is_male_content(title):
                 continue
