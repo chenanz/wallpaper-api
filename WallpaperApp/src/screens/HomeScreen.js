@@ -15,7 +15,7 @@ const { width } = Dimensions.get('window');
 const NUM_COLUMNS = 2;
 
 // ★★★ 改成你电脑的局域网 IP（不要用 localhost）
-const API_BASE = 'http://192.168.1.95:3000/wallpapers';
+const API_BASE = 'https://wallpaper-api-bw5h.onrender.com/wallpapers';
 
 const CATEGORIES = ['原神COS', '原神同人', '星铁同人', '崩坏同人'];
 

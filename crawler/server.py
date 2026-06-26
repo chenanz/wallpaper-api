@@ -37,12 +37,18 @@ def fetch_mihoyo(forum_id, page=1):
         return []
 
 @app.route("/wallpapers")
+@app.route("/")
 def wallpapers():
     cat = request.args.get("category", "原神COS")
     page = int(request.args.get("page", 1))
     fid = FORUMS.get(cat, 49)
     data = fetch_mihoyo(fid, page)
     return jsonify(data)
+
+# 每 UptimeRobot ping 一下，让 Render 免费版保持唤醒
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 import os
 
