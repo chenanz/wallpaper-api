@@ -26,6 +26,10 @@ CHARACTER_ALIASES = {
     "娜维娅": ["刺玫会"],
     "仆人": ["阿蕾奇诺", "佩露薇利"],
     "克洛琳德": ["决斗代理人"],
+    "茜特菈莉": ["黑曜石奶奶"],
+    "玛薇卡": ["火神"],
+    "蓝砚": ["蓝师傅"],
+    "梦见月瑞希": ["瑞希"],
     # 星铁
     "布洛妮娅": ["鸭鸭", "大鸭鸭"],
     "希儿": ["蝴蝶"],
@@ -44,6 +48,7 @@ CHARACTER_ALIASES = {
     "花火": ["假面愚者"],
     "镜流": ["剑首"],
     "遐蝶": ["死荫之蝶"],
+    "赛飞儿": ["猫猫"],
     # 崩坏3
     "琪亚娜": ["草履虫", "薪炎"],
     "芽衣": ["雷律"],
@@ -57,7 +62,7 @@ CHARACTER_ALIASES = {
     "终焉之律者": ["终焉"],
 }
 
-# 生成一个反向查询：别名也能找到主角色名
+# 生成反向查询：别名 -> 主角色名
 NAME_LOOKUP = {}
 for main, aliases in CHARACTER_ALIASES.items():
     NAME_LOOKUP[main] = main
@@ -72,8 +77,8 @@ GAME_FORUMS = {
     "崩坏3": ["崩坏同人"],
 }
 
-# 去重缓存
-seen_ids = set()
+PAGE_SIZE = 20
+
 
 def get_keywords(character):
     """根据角色名获取所有应匹配的关键词"""
@@ -83,6 +88,7 @@ def get_keywords(character):
     aliases = CHARACTER_ALIASES.get(main, [])
     return list(set([main] + aliases))
 
+
 def title_matches(title, keywords):
     if not title:
         return False
@@ -91,9 +97,11 @@ def title_matches(title, keywords):
             return True
     return False
 
+
 def fetch_mihoyo(forum_id, page=1):
+    """抓取一页帖子"""
     url = "https://bbs-api.mihoyo.com/post/wapi/getForumPostList"
-    params = {"forum_id": forum_id, "page_size": 20, "page": page}
+    params = {"forum_id": forum_id, "page_size": PAGE_SIZE, "page": page}
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         r = requests.get(url, params=params, headers=headers, timeout=15)
@@ -106,10 +114,6 @@ def fetch_mihoyo(forum_id, page=1):
             if not cover:
                 continue
             post_id = str(post["post_id"])
-            if post_id in seen_ids:
-                continue
-            seen_ids.add(post_id)
-            
             title = post.get("subject", "")
             result.append({
                 "id": post_id,
@@ -126,48 +130,68 @@ def fetch_mihoyo(forum_id, page=1):
         print(f"fetch error: {e}")
         return []
 
+
+def collect_posts(forum_ids, start_page, max_pages=1):
+    """聚合多个论坛的多页数据"""
+    all_data = []
+    seen_ids = set()
+    for page in range(start_page, start_page + max_pages):
+        for fid in forum_ids:
+            posts = fetch_mihoyo(fid, page)
+            for post in posts:
+                if post["id"] in seen_ids:
+                    continue
+                seen_ids.add(post["id"])
+                all_data.append(post)
+    return all_data
+
+
 @app.route("/wallpapers")
 @app.route("/")
 def wallpapers():
     cat = request.args.get("category", "原神")
     page = int(request.args.get("page", 1))
     character = request.args.get("character", "")
-    
+    sort = request.args.get("sort", "views")
+
     # 确定要爬哪些论坛
-    forum_ids = []
     if cat in FORUMS:
         forum_ids = [FORUMS[cat]]
     elif cat in GAME_FORUMS:
-        for fname in GAME_FORUMS[cat]:
-            forum_ids.append(FORUMS[fname])
+        forum_ids = [FORUMS[fname] for fname in GAME_FORUMS[cat]]
     else:
-        # 默认全拉
         forum_ids = list(FORUMS.values())
-    
-    all_data = []
-    for fid in forum_ids:
-        all_data.extend(fetch_mihoyo(fid, page))
-    
+
+    # 按角色筛选时，多翻几页（否则单一角色可能一页不够）；全部时只用一页避免太慢
+    max_pages = 3 if character else 1
+    all_data = collect_posts(forum_ids, page, max_pages)
+
     # 按角色名筛选
     if character:
         keywords = get_keywords(character)
         all_data = [item for item in all_data if title_matches(item["title"], keywords)]
-    
-    # 过滤掉标题带"男"字眼的（简单过滤男角色）
+
+    # 简单过滤掉明显男角色的帖子
     all_data = [item for item in all_data if "男" not in item.get("title", "")]
-    
-    # 按浏览量排序
-    all_data.sort(key=lambda x: x.get("views", 0), reverse=True)
-    
+
+    # 排序
+    if sort == "views":
+        all_data.sort(key=lambda x: x.get("views", 0), reverse=True)
+    elif sort == "new":
+        all_data.reverse()
+
     return jsonify(all_data)
+
 
 @app.route("/characters")
 def characters():
     return jsonify(list(CHARACTER_ALIASES.keys()))
 
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
 
 import os
 
